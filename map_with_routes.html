@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mumbai Traffic Predictor</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
+<style>
+body { font-family: 'Roboto', Arial, sans-serif; background: #ececec; transition: background 0.3s; }
+.navbar { background: linear-gradient(90deg, #1e3c72, #2465aa); box-shadow: 0 2px 5px rgba(0,0,0,0.12);}
+.navbar-brand { display: flex; align-items: center; font-weight: 700; font-size: 1.3rem; }
+.navbar-brand img { height: 28px; margin-right: 8px; vertical-align: middle; }
+#map { border: 1.5px solid #dddfef; border-radius: 16px; box-shadow: 0 4px 20px #18365a14; min-height: 340px; height: 60vh; background: #e6eeff; }
+.info-panel { background: #fff; box-shadow: 0 6px 24px #1c345e1c; border-radius: 20px; padding: 1.6rem 2rem; scrollbar-width: thin; scrollbar-color: #bbb #eee; position: sticky; top: 18px; margin-top:16px;}
+.info-panel::-webkit-scrollbar { width: 8px; }
+.info-panel::-webkit-scrollbar-thumb { background-color: #bbb; border-radius: 10px; }
+.btn { border-radius: 8px; font-weight: 600; transition: background 0.2s; }
+.btn-success:hover, .btn-primary:hover { filter: brightness(1.08); box-shadow: 0 2px 10px #2678f242; }
+.list-group-item { display: flex; align-items: center; font-weight: 500; justify-content: space-between; font-size: 1.05rem; border-radius: 7px; margin-bottom: 2px; border: none; background: #f6f8fa; transition: background 0.2s; }
+.list-group-item:hover { background: #eaeefd; cursor: pointer; }
+.badge { font-size: 1em; padding: 6px 13px; }
+.legend-circle { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 2px solid #dee2e6; margin-right: 8px;}
+.legend-red { background: #dc3545; }
+.legend-orange { background: #fd7e14; }
+.legend-green { background: #28a745; }
+.footer { text-align:center; padding:18px 8px 16px 8px; background:#223c60; color:white; font-size:16px; letter-spacing:.5px; margin-top:36px;}
+.footer .bi { font-size: 1.2em; margin: 0 9px; }
+.card { border-radius: 18px; }
+.pulse { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.5); animation: pulse-red 1.3s infinite;}
+@keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.5);} 70% { box-shadow: 0 0 0 18px rgba(220, 53, 69, 0);}100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);}}
+body.dark-mode { background: #171c28 !important; color: #d7dcff !important; }
+body.dark-mode .info-panel, body.dark-mode .card { background: #232a3b !important; color: #eaefff !important; box-shadow: 0 4px 32px #1116;}
+body.dark-mode .navbar { background: linear-gradient(90deg, #111730, #283149) !important;}
+body.dark-mode .footer { background: #161a2b !important; }
+body.dark-mode #map { background: #161a2b !important; }
+body.dark-mode .list-group-item { background: #20273b !important; color: #d7dcff !important;}
+/* DARK MODE Choices.js FIX START */
+body.dark-mode .choices__list--dropdown, 
+body.dark-mode .choices__list--single, 
+body.dark-mode .choices__item {
+  background: #232a3b !important;
+  color: #eaefff !important;
+}
+body.dark-mode .choices__list--dropdown .choices__item--selectable {
+  color: #eaefff !important;
+  background: #232a3b !important;
+}
+body.dark-mode .choices__input {
+  color: #eaefff !important;
+  background: #232a3b !important;
+}
+body.dark-mode .choices[data-type*=select-one] .choices__input {
+  background-color: #232a3b !important;
+  color: #eaefff !important;
+}
+body.dark-mode .choices__list .choices__item--selectable.is-highlighted {
+  background: #29314a !important;
+  color: #fff !important;
+}
+/* DARK MODE Choices.js FIX END */
+@media (max-width:900px){
+  #map{height:295px}
+  .info-panel{margin-top:10px;padding:12px 2vw;font-size:1rem;}
+  .navbar-brand{font-size:20px;padding-left:6px;}
+}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-dark px-2 d-flex justify-content-between align-items-center">
+  <span class="navbar-brand">
+    <img src="https://cdn-icons-png.flaticon.com/512/2418/2418257.png" alt="Logo"/>
+    Mumbai Traffic Predictor
+  </span>
+  <div>
+    <button class="btn btn-outline-light me-2" data-bs-toggle="modal" data-bs-target="#profileModal" title="My Profile"><i class="bi bi-person-circle"></i></button>
+    <button class="btn btn-outline-light ms-2" onclick="toggleTheme()" id="themeBtn" title="Toggle Dark/Light"><i class="bi bi-moon"></i></button>
+    <button class="btn btn-outline-light ms-2" data-bs-toggle="modal" data-bs-target="#loginModal"><i class="bi bi-box-arrow-in-right"></i> Login</button>
+    <button class="btn btn-light text-primary ms-2" data-bs-toggle="modal" data-bs-target="#signupModal"><i class="bi bi-person-plus"></i> Sign Up</button>
+  </div>
+</nav>
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-lg-8 col-md-12">
+      <div id="map"></div>
+      <div style="max-width:410px; margin:20px auto;">
+        <canvas id="trendChart" style="width:100%;height:180px;border-radius:12px;box-shadow:0 2px 8px #0001;"></canvas>
+      </div>
+      <div class="row mb-4" id="dashboard-widgets" style="max-width:800px; margin: 0 auto;">
+        <div class="col-md-4 mb-2"><div class="card border-0 shadow p-3"><div class="fw-bold text-secondary mb-1"><i class="bi bi-calendar-week"></i> Busier Days</div><div id="busyDays" style="font-size:1.3em;">--</div></div></div>
+        <div class="col-md-4 mb-2"><div class="card border-0 shadow p-3"><div class="fw-bold text-secondary mb-1"><i class="bi bi-bar-chart-steps"></i> Avg. Predicted %</div><div id="avgCongestion" style="font-size:1.3em;">--</div></div></div>
+        <div class="col-md-4 mb-2"><div class="card border-0 shadow p-3"><div class="fw-bold text-secondary mb-1"><i class="bi bi-file-earmark-arrow-down"></i> Export Data</div><button class="btn btn-outline-primary" onclick="exportCSV()">Export as CSV</button></div></div>
+      </div>
+    </div>
+    <div class="col-lg-4 col-md-12 info-panel">
+      <div class="mb-2"><label for="daySelect" class="form-label" style="font-weight:650;">Day</label><select id="daySelect" class="form-select" title="Choose day"></select></div>
+      <div class="mb-2"><label for="hourSelect" class="form-label" style="font-weight:650;">Hour</label><select id="hourSelect" class="form-select" title="Pick hour"></select></div>
+      <hr>
+      <div class="mb-2"><label for="sourceSelect" class="form-label" style="font-weight:650;">Choose Starting Point</label><select id="sourceSelect" class="form-select" title="Select Source Station"></select></div>
+      <div class="mb-3"><label for="destSelect" class="form-label" style="font-weight:650;">Choose Destination</label><select id="destSelect" class="form-select" title="Select Destination Station"></select></div>
+      <button class="btn btn-success w-100 mb-2" id="showRouteBtn" onclick="highlightRoute()" disabled>Show Route & Traffic</button>
+      <button class="btn btn-primary w-100 mb-3" id="notifyBtn" onclick="showNotifyModal()" disabled>Request Daily Traffic Email</button>
+      <div id="routeMsg" class="fw-semibold text-primary mb-2"></div>
+      <h6 class="fw-semibold mt-2 mb-1">Congestion Snapshot</h6>
+      <ul id="congestion-list" class="list-group mb-3"></ul>
+      <h6>
+        Legend
+        <span class="legend-circle legend-red filter-legend" onclick="filterLegend('high')" style="cursor:pointer"></span> High (&gt;70%)
+        <span class="legend-circle legend-orange filter-legend" onclick="filterLegend('moderate')" style="cursor:pointer"></span> Moderate (50-70%)
+        <span class="legend-circle legend-green filter-legend" onclick="filterLegend('low')" style="cursor:pointer"></span> Low (&lt;50%)
+      </h6>
+    </div>
+  </div>
+</div>
+<div class="footer">
+  © 2025 Mumbai Traffic Predictor | All rights reserved.<br>
+  <a href="#" class="text-light"><i class="bi bi-github"></i></a>
+  <a href="#" class="text-light"><i class="bi bi-linkedin"></i></a>
+  <a href="#" class="text-light"><i class="bi bi-envelope"></i></a>
+  <div style="margin-top:8px"><a href="#" class="text-light" data-bs-toggle="modal" data-bs-target="#aboutModal" style="text-decoration:underline;">About/Contact</a></div>
+</div>
+
+<!-- Toast/Loading Overlay -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1080">
+  <div id="mainToast" class="toast align-items-center text-bg-primary border-0">
+    <div class="d-flex">
+      <div class="toast-body" id="toastMsg"></div>
+      <button type="button" class="btn-close btn-close-white ms-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+<div id="loadingOverlay" style="display:none; position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0003;z-index:1070;justify-content:center;align-items:center;">
+  <div class="spinner-border text-primary" style="width:3rem; height:3rem;"></div>
+</div>
+
+<!-- Profile Modal -->
+<div class="modal fade" id="profileModal"><div class="modal-dialog"><div class="modal-content p-3">
+  <div class="modal-header"><h5 class="modal-title"><i class="bi bi-person-circle"></i> My Profile</h5>
+    <button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <b>Name:</b> Demo User<br>
+    <b>Email:</b> user@example.com<br>
+    <b>Recent Route(s):</b> (sample) Andheri → Thane, CSMT → Dadar<br>
+    <hr><div class="text-secondary small">This is a demo. Add full auth for real users!</div>
+  </div>
+</div></div></div>
+
+<!-- About/Contact Modal -->
+<div class="modal fade" id="aboutModal"><div class="modal-dialog"><div class="modal-content p-3">
+  <div class="modal-header"><h5 class="modal-title"><i class="bi bi-info-circle"></i> About Project</h5>
+    <button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <p>This portal predicts Mumbai railway congestion using machine learning and visualizes real-time status. Built by [Your Team/Name].<br>
+    Connect: <a href="mailto:your@email.com">your@email.com</a>
+    <br>Docs: Soon</p>
+  </div>
+</div></div></div>
+
+<!-- Login/Signup (simple working demo modals only, replace/expand as your project needs) -->
+<div class="modal fade" id="loginModal">
+  <div class="modal-dialog">
+    <div class="modal-content p-3">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-box-arrow-in-right"></i> Login</h5>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="loginForm" autocomplete="off" onsubmit="event.preventDefault();showToast('Login demo!','info');bootstrap.Modal.getInstance(document.getElementById('loginModal')).hide();">
+        <div class="modal-body">
+          <input class="form-control mb-2" id="loginEmail" placeholder="Email" type="email" required>
+          <input type="password" class="form-control mb-2" id="loginPwd" placeholder="Password" minlength="4" required>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary w-100">Login</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="signupModal">
+  <div class="modal-dialog">
+    <div class="modal-content p-3">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus"></i> Sign Up</h5>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="signupForm" autocomplete="off" onsubmit="event.preventDefault();showToast('Signup demo!','info');bootstrap.Modal.getInstance(document.getElementById('signupModal')).hide();">
+        <div class="modal-body">
+          <input class="form-control mb-2" placeholder="Email" type="email" required>
+          <input class="form-control mb-2" placeholder="Password" type="password" minlength="4" required>
+          <input class="form-control" placeholder="Repeat password" type="password" minlength="4" required>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary w-100">Sign Up</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="notifyModal"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><strong>Get Email Alerts</strong><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <input id="notifyEmail" class="form-control mb-2" type="email" placeholder="your@email.com"/>
+    <div id="notifyRouteTxt" class="fw-semibold text-secondary"></div>
+    <button class="btn btn-primary w-100" onclick="subscribeTraffic()">Subscribe!</button>
+  </div>
+</div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<script>
+function showToast(msg, type = "primary") {
+  const toastEl = document.getElementById('mainToast');
+  toastEl.className = `toast align-items-center text-bg-${type} border-0`;
+  document.getElementById('toastMsg').innerText = msg;
+  const toast = new bootstrap.Toast(toastEl, { delay: 2100 });
+  toast.show();
+}
+function showLoading(show) {
+  document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+}
+const map = L.map('map').setView([19.076,72.8777],11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:18 }).addTo(map);
+const stations = [ "Churchgate","Marine Lines","Charni Road","Grant Road","Mumbai Central","Mahalaxmi","Lower Parel","Elphinstone",
+  "Dadar","Malad","Andheri","Kandivali","Mira Road","Vasai","Virar","CSMT","Masjid","Sandhurst Road","Byculla","Dadar Central",
+  "Kurla","Vidyavihar","Ghatkopar","Vikhroli","Kanjur Marg","Bhandup","Mulund","Thane","Diva","Kalyan" ];
+let congestion_data = [], routeLine = null, routeStations = [];
+window.legendFilter = null;
+function filterLegend(type) {
+  window.legendFilter = type;
+  updateCongestion();
+  showToast(
+    type=="high" ? "Filtering: High Congestion" : 
+    type=="moderate" ? "Filtering: Moderate" : 
+    type=="low" ? "Filtering: Low" : "No filter",
+    type=="high" ? "danger" : type=="moderate" ? "warning" : "success"
+  );
+}
+function fillSelects(){
+  document.getElementById('daySelect').innerHTML = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+    .map(d => `<option>${d}</option>`).join('');
+  document.getElementById('hourSelect').innerHTML = Array.from({length:24}, (_,i) => `<option value="${i}">${i}:00</option>`).join('');
+  document.getElementById('sourceSelect').innerHTML = stations.map(s => `<option>${s}</option>`).join('');
+  document.getElementById('destSelect').innerHTML = stations.map(s => `<option>${s}</option>`).join('');
+  new Choices('#sourceSelect', {searchEnabled:true, itemSelectText:""});
+  new Choices('#destSelect', {searchEnabled:true, itemSelectText:""});
+}
+function clearMap(){
+  if(routeLine) { map.removeLayer(routeLine); routeLine = null; }
+  routeStations.forEach(m => map.removeLayer(m));
+  routeStations = [];
+}
+function updateCongestion() {
+  const day = document.getElementById('daySelect').value;
+  const hour = document.getElementById('hourSelect').value;
+  showLoading(true);
+  fetch(`/api/get_congestion?day=${day}&hour=${hour}`)
+    .then(r => { if (!r.ok) throw new Error("API error"); return r.json(); })
+    .then(data => {
+      congestion_data = data;
+      clearMap();
+      document.getElementById("congestion-list").innerHTML = '';
+      data.forEach(pt => {
+        let cat = pt.congestion > 70 ? 'high' : pt.congestion > 50 ? 'moderate' : 'low';
+        if (window.legendFilter && cat !== window.legendFilter) return;
+        let color = cat === 'high' ? "#dc3545" : cat === 'moderate' ? "#fd7e14" : "#28a745";
+        let marker = L.circleMarker([pt.lat, pt.lng], { radius:8, color, fillColor:color, fillOpacity:0.7 }).addTo(map);
+        if (cat === 'high') setTimeout(()=>{try{marker._path.classList.add('pulse');}catch{}} ,400);
+        marker.bindPopup(`<b>${pt.area}</b><br>Congestion: ${pt.congestion}%`);
+        routeStations.push(marker);
+        let badgeClass = cat === 'high' ? 'bg-danger':cat === 'moderate'?'bg-warning text-dark':'bg-success';
+        let li = document.createElement("li");
+        li.className = "list-group-item";
+        li.innerHTML = `<span style="font-size:1.1em;">${pt.area}</span> <span class="badge ${badgeClass}">${pt.congestion}%</span>`;
+        li.onclick = () => map.panTo([pt.lat, pt.lng]);
+        document.getElementById('congestion-list').appendChild(li);
+      });
+      showGraph();
+      showToast("Congestion snapshot updated!", "success");
+    })
+    .catch(() => showToast("API/network error!", "danger"))
+    .finally(()=>showLoading(false));
+}
+function showGraph(){
+  showLoading(true);
+  fetch('/api/congestion_trend')
+    .then(r => { if (!r.ok) throw new Error("API error"); return r.json(); })
+    .then(j => {
+      if (window.trendChart && typeof window.trendChart.destroy === "function") {
+        window.trendChart.destroy();
+      }
+      window.trendChart = new Chart(document.getElementById('trendChart').getContext('2d'), {
+        type: 'line', data: {labels: j.labels, datasets: [{
+          label: 'Avg Congestion %', data: j.data, fill: true,
+          borderColor: '#2678f2', backgroundColor: 'rgba(38,120,242,0.17)', tension: 0.3, pointRadius: 5
+        }]}, options: { responsive: true, plugins: { legend: { display: true } }, scales: { y: { beginAtZero: true, max: 100 } } }
+      });
+      fillAnalytics(j);
+      showLoading(false);
+    })
+    .catch(()=>{ showToast("Trend API error!", "danger"); showLoading(false); });
+}
+function fillAnalytics(trend) {
+  let max = Math.max(...trend.data);
+  let busyDays = trend.labels.filter((_,i) => trend.data[i] === max).join(", ");
+  let avg = (trend.data.reduce((a,b)=>a+b,0)/trend.data.length).toFixed(1);
+  document.getElementById('busyDays').innerText = busyDays || "--";
+  document.getElementById('avgCongestion').innerText = avg + " %";
+}
+function exportCSV() {
+  let csv = "Station,Congestion (%)\n";
+  congestion_data.forEach(pt => { csv += `${pt.area},${pt.congestion}\n`; });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'congestion_snapshot.csv'; a.click();
+}
+function highlightRoute(){
+  let src = document.getElementById('sourceSelect').value;
+  let dst = document.getElementById('destSelect').value;
+  if(src === dst) {
+    showToast("Select different source & destination!", "warning"); return;
+  }
+  let srcIdx = stations.indexOf(src);
+  let dstIdx = stations.indexOf(dst);
+  clearMap();
+  let list;
+  if(srcIdx < dstIdx) list = stations.slice(srcIdx, dstIdx+1);
+  else list = stations.slice(dstIdx, srcIdx+1).reverse();
+  let latlngs = list.map(st => {
+    let o = congestion_data.find(x => x.area === st);
+    return o ? [o.lat, o.lng] : null;
+  }).filter(Boolean);
+  if(latlngs.length > 1){
+    routeLine = L.polyline(latlngs, { color:'#e4820d', weight:8, opacity:0.8 }).addTo(map);
+    latlngs.forEach((ll, i) => {
+      let o = congestion_data.find(pt => pt.area === list[i]);
+      let cat = o && (o.congestion > 70 ? "high":o.congestion > 50?"moderate":"low");
+      let color = cat === "high" ? "#dc3545" : cat === "moderate" ? "#fd7e14" : "#28a745";
+      let marker = L.circleMarker(ll, { radius: 12, color, fillColor: color, fillOpacity: 0.8 }).addTo(map);
+      if(cat === "high") setTimeout(()=>{try{marker._path.classList.add('pulse');}catch{}},400);
+      marker.bindPopup(`<b>${list[i]}</b><br>Congestion: ${o ? o.congestion : "?"}%`);
+      routeStations.push(marker);
+    });
+    map.fitBounds(routeLine.getBounds());
+    let hi = Math.max(...list.map(s => {
+      let o = congestion_data.find(pt => pt.area === s); return o ? o.congestion : 0;
+    }));
+    let msg = hi > 70 ? "Heavy " : hi > 50 ? "Moderate" : "Smooth ";
+    document.getElementById('routeMsg').innerHTML = `<strong>Traffic:</strong> ${msg}<br><strong>Path:</strong> ${list.join(" → ")}`;
+    showToast("Route highlighted!", hi > 70 ? "danger" : hi > 50 ? "warning" : "success");
+  }
+}
+function showNotifyModal(){
+  let src = document.getElementById('sourceSelect').value;
+  let dst = document.getElementById('destSelect').value;
+  document.getElementById('notifyRouteTxt').innerHTML = `For Route: <b>${src} &rarr; ${dst}</b>`;
+  var m = new bootstrap.Modal(document.getElementById('notifyModal')); m.show();
+}
+function subscribeTraffic(){
+  let email = document.getElementById('notifyEmail').value;
+  if(!email.trim()) { showToast("Please enter email!", "danger"); return; }
+  showToast("Subscribed " + email + " to daily route alerts! (demo)", "success");
+  bootstrap.Modal.getInstance(document.getElementById('notifyModal')).hide();
+}
+function toggleTheme() {
+  document.body.classList.toggle("dark-mode");
+  let icon = document.getElementById('themeBtn').querySelector('i');
+  icon.className = icon.className.includes('moon') ? 'bi bi-sun' : 'bi bi-moon';
+  showToast(document.body.classList.contains('dark-mode') ? "Dark mode on" : "Light mode on", "info");
+}
+fillSelects();
+updateCongestion();
+['daySelect','hourSelect'].forEach(id => document.getElementById(id).onchange = updateCongestion);
+document.getElementById('sourceSelect').onchange =
+document.getElementById('destSelect').onchange = () => {
+  let src = document.getElementById('sourceSelect').value;
+  let dst = document.getElementById('destSelect').value;
+  let disabled = (src === dst);
+  document.getElementById('showRouteBtn').disabled = disabled;
+  document.getElementById('notifyBtn').disabled = disabled;
+};
+document.getElementById('showRouteBtn').disabled = true;
+document.getElementById('notifyBtn').disabled = true;
+</script>
+</body>
+</html>
